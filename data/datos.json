@@ -1,0 +1,18 @@
+[
+  {
+    "autor": "Juan Perez",
+    "mensaje": "Falla detectada en la subestación Central Norte",
+    "subestacion": "Central Norte",
+    "fecha_hora": "2024-06-01T10:00:00",
+    "incidentes": ["INC0001"],
+    "requerimientos": ["REQ0001"]
+  },
+  {
+    "autor": "Ana Gomez",
+    "mensaje": "Revisión realizada en CE Sur",
+    "ce": "CE Sur",
+    "fecha_hora": "2024-06-02T11:00:00",
+    "incidentes": [],
+    "requerimientos": []
+  }
+]

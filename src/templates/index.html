@@ -1,0 +1,455 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>Networking</title>
+
+    <!-- Favicon -->
+    <link rel="icon" type="image/x-icon" href="{{ url_for('static', filename='icons/favicon.ico') }}">
+
+    <!-- Manifest PWA -->
+    <link rel="manifest" href="{{ url_for('static', filename='manifest.json') }}">
+    <meta name="theme-color" content="#61dafb">
+    <meta name="application-name" content="Networking">
+
+    <!-- Fuente -->
+    <link href="https://fonts.googleapis.com/css2?family=Roboto+Mono&display=swap" rel="stylesheet">
+
+    <style>
+        /* === Estilos principales === */
+        body {
+            font-family: 'Roboto Mono', monospace;
+            background: #1e2a38;
+            margin: 0;
+            padding: 1.5rem;
+            color: #e0e6f0;
+            min-height: 100vh;
+        }
+        header {
+            text-align: center;
+            margin-bottom: 2rem;
+            position: relative;
+        }
+        header h1 {
+            margin: 0;
+            color: #61dafb;
+            font-weight: 700;
+            font-size: 2.4rem;
+            letter-spacing: 2px;
+            text-shadow: 0 0 8px #61dafb88;
+        }
+        header p.usuario {
+            margin: 0.5rem 0 0 0;
+            font-style: italic;
+            color: #a0b0c0;
+            font-size: 1rem;
+        }
+        header .descargas {
+            margin-top: 1rem;
+            text-align: center;
+        }
+        header .descargas a {
+            margin: 0 1rem;
+            font-weight: 600;
+            color: #61dafb;
+            text-decoration: none;
+            cursor: pointer;
+            font-size: 1.1rem;
+            transition: color 0.3s ease;
+        }
+        header .descargas a:hover,
+        header .descargas a:focus {
+            color: #21a1f1;
+            text-decoration: underline;
+            outline: none;
+        }
+        .logout-container {
+            position: absolute;
+            top: 1rem;
+            right: 1rem;
+        }
+        .logout-button {
+            background: #ff5555;
+            color: white;
+            border: none;
+            padding: 0.5rem 1rem;
+            border-radius: 8px;
+            font-weight: 700;
+            font-family: 'Roboto Mono', monospace;
+            cursor: pointer;
+            box-shadow: 0 4px 12px #ff5555aa;
+            transition: background-color 0.3s ease, box-shadow 0.3s ease;
+            user-select: none;
+            font-size: 1rem;
+        }
+        .logout-button:hover,
+        .logout-button:focus {
+            background: #ff3333;
+            box-shadow: 0 6px 18px #ff3333cc;
+            outline: none;
+        }
+        /* Layout en dos columnas */
+        .layout-grid {
+            display: grid;
+            grid-template-columns: 1fr 2fr;
+            gap: 2rem;
+            max-width: 1400px;
+            margin: 0 auto;
+        }
+        .columna-busqueda {
+            /* Espacio para la búsqueda */
+        }
+        .columna-resultados {
+            /* Resultados ocupan más espacio */
+        }
+        form.filtro {
+            background: #243447;
+            padding: 1.5rem 1.8rem;
+            border-radius: 12px;
+            display: grid;
+            grid-template-columns: 1fr;
+            gap: 1.2rem;
+            align-items: end;
+            box-shadow: 0 8px 20px rgba(0,0,0,0.4);
+        }
+        form.filtro label {
+            font-weight: 600;
+            margin-bottom: 0.4rem;
+            display: block;
+            color: #a0b0c0;
+            user-select: none;
+        }
+        form.filtro input[type="text"],
+        form.filtro input[type="date"] {
+            width: 100%;
+            padding: 0.6rem 0.8rem;
+            border: none;
+            border-radius: 8px;
+            font-size: 1rem;
+            font-weight: 500;
+            background: #1b2735;
+            color: #e0e6f0;
+            box-shadow: inset 0 0 8px #0f172a;
+            transition: background-color 0.3s ease, box-shadow 0.3s ease;
+            outline-offset: 2px;
+        }
+        form.filtro input[type="text"]::placeholder,
+        form.filtro input[type="date"]::placeholder {
+            color: #7a8a9e;
+        }
+        form.filtro input[type="text"]:focus,
+        form.filtro input[type="date"]:focus {
+            background: #16202b;
+            box-shadow: 0 0 10px #61dafb;
+            outline: none;
+        }
+        form.filtro input[type="submit"] {
+            grid-column: span 1;
+            padding: 0.75rem 1.5rem;
+            background: #61dafb;
+            color: #16202b;
+            border: none;
+            border-radius: 10px;
+            font-weight: 700;
+            font-size: 1.1rem;
+            cursor: pointer;
+            box-shadow: 0 6px 15px #3bb0f4aa;
+            transition: background-color 0.3s ease, box-shadow 0.3s ease;
+            letter-spacing: 1.2px;
+            user-select: none;
+        }
+        form.filtro input[type="submit"]:hover,
+        form.filtro input[type="submit"]:focus {
+            background: #52c0ff;
+            box-shadow: 0 8px 20px #3bb0f4cc;
+            outline: none;
+        }
+        .mensaje {
+            background: #243447;
+            margin: 0 0 1.5rem 0;
+            padding: 1.2rem 1.8rem;
+            border-radius: 12px;
+            box-shadow: 0 6px 18px rgba(0,0,0,0.5);
+            color: #d0d8e8;
+        }
+        .mensaje .header {
+            display: flex;
+            flex-wrap: wrap;
+            justify-content: space-between;
+            font-size: 0.95rem;
+            color: #8aa1c1;
+            margin-bottom: 0.6rem;
+        }
+        .mensaje .header div {
+            margin-right: 1.2rem;
+        }
+        .mensaje .subestacion {
+            color: #61dafb;
+            font-weight: 700;
+            text-transform: capitalize;
+        }
+        .mensaje p {
+            white-space: pre-wrap;
+            margin: 0;
+            font-size: 1.05rem;
+            color: #cbd6f0;
+            line-height: 1.4;
+        }
+        nav.paginacion {
+            margin: 2.5rem 0;
+            text-align: center;
+        }
+        nav.paginacion a,
+        nav.paginacion span {
+            display: inline-block;
+            margin: 0 0.4rem;
+            padding: 0.5rem 1rem;
+            border-radius: 8px;
+            text-decoration: none;
+            font-weight: 700;
+            color: #61dafb;
+            border: 1.8px solid #61dafb;
+            cursor: pointer;
+            transition: background-color 0.3s ease, color 0.3s ease;
+            user-select: none;
+            font-size: 1rem;
+        }
+        nav.paginacion span.current {
+            background: #61dafb;
+            color: #16202b;
+            cursor: default;
+            border-color: #61dafb;
+        }
+        nav.paginacion span.disabled {
+            color: #7a8a9e;
+            border-color: #7a8a9e;
+            cursor: default;
+        }
+        nav.paginacion a:hover,
+        nav.paginacion a:focus {
+            background: #52c0ff;
+            border-color: #52c0ff;
+            color: #16202b;
+            outline: none;
+        }
+        @media (max-width: 480px) {
+            .layout-grid {
+                grid-template-columns: 1fr;
+                gap: 1rem;
+            }
+            form.filtro {
+                grid-template-columns: 1fr;
+            }
+            nav.paginacion a,
+            nav.paginacion span {
+                padding: 0.4rem 0.7rem;
+                font-size: 0.9rem;
+            }
+            header h1 {
+                font-size: 1.8rem;
+            }
+        }
+        /* Estilos para el formulario de subida */
+        section.subir-chat {
+            max-width: 900px;
+            margin: 0 auto 2rem auto;
+            background: #243447;
+            padding: 1.5rem;
+            border-radius: 12px;
+            box-shadow: 0 8px 20px rgba(0,0,0,0.4);
+            color: #e0e6f0;
+        }
+        section.subir-chat h2 {
+            margin-top: 0;
+            margin-bottom: 1rem;
+            color: #61dafb;
+        }
+        section.subir-chat label {
+            display: block;
+            margin-bottom: 0.5rem;
+            font-weight: 600;
+        }
+        section.subir-chat input[type="file"] {
+            background: #1b2735;
+            border: none;
+            border-radius: 8px;
+            padding: 0.5rem;
+            color: #e0e6f0;
+            width: 100%;
+            box-sizing: border-box;
+            cursor: pointer;
+        }
+        section.subir-chat button {
+            margin-top: 1rem;
+            background: #61dafb;
+            color: #16202b;
+            border: none;
+            padding: 0.6rem 1.2rem;
+            border-radius: 8px;
+            font-weight: 700;
+            cursor: pointer;
+            box-shadow: 0 6px 15px #3bb0f4aa;
+            transition: background-color 0.3s ease, box-shadow 0.3s ease;
+            user-select: none;
+            font-size: 1rem;
+        }
+        section.subir-chat button:hover,
+        section.subir-chat button:focus {
+            background: #52c0ff;
+            box-shadow: 0 8px 20px #3bb0f4cc;
+            outline: none;
+        }
+        section.subir-chat p#mensajeRespuesta {
+            margin-top: 1rem;
+            font-weight: 600;
+        }
+        /* Mensaje de no resultados adaptado */
+        .no-resultados {
+            text-align: center;
+            font-size: 1.2rem;
+            color: #7a8a9e;
+        }
+    </style>
+</head>
+<body>
+
+<header>
+    <h1>Networking</h1>
+    {% if usuario %}
+        <p class="usuario">Usuario: {{ usuario }}</p>
+    {% endif %}
+    <div class="logout-container">
+        <form method="get" action="{{ url_for('logout') }}">
+            <button type="submit" class="logout-button" aria-label="Cerrar sesión">Cerrar sesión</button>
+        </form>
+    </div>
+    <div class="descargas" role="region" aria-label="Descargas de documentos">
+        <a href="{{ url_for('descargar', nombre_archivo='Red_Fibra_Enel_Enero_2024.pdf.pdf') }}" download>
+            📄 Descargar PDF Red Fibra Enel Enero 2024
+        </a>
+        <a href="{{ url_for('descargar', nombre_archivo='INVENTARIO ODFs MAYO 23-05-2025.xlsx') }}" download>
+            📊 Descargar Excel Inventario ODFs 2025
+        </a>
+        <a href="https://1drv.ms/f/c/61b6aeba3b1b7947/EjN5ZTxU8CZIjLO6VvPmS0kBCud5rTMwURmKdM2L7c4qzg?e=W74Z7w" target="_blank" rel="noopener noreferrer">
+            📁 Información Técnica Inventario de Equipos
+        </a>
+    </div>
+</header>
+
+<main>
+    <!-- Formulario para subir chat_networking.txt -->
+    <section class="subir-chat" aria-label="Formulario para subir archivo chat_networking.txt">
+        <h2>Subir archivo chat_networking.txt</h2>
+        <form id="formSubirChat" enctype="multipart/form-data" method="post" action="{{ url_for('subir_chat') }}">
+            <label for="archivo">Selecciona archivo .txt:</label>
+            <input type="file" id="archivo" name="archivo" accept=".txt" required />
+            <button type="submit">Subir archivo</button>
+        </form>
+        <p id="mensajeRespuesta" role="alert" aria-live="polite"></p>
+    </section>
+
+    <!-- Layout en dos columnas: búsqueda y resultados -->
+    <div class="layout-grid">
+        <div class="columna-busqueda">
+            <!-- Formulario de filtros -->
+            <form method="get" action="{{ url_for('index') }}" class="filtro" aria-label="Formulario de filtros">
+                <div>
+                    <label for="autor">Autor</label>
+                    <input type="text" id="autor" name="autor" value="{{ autor|default('') }}" placeholder="Ejemplo: Yesid Cortes" />
+                </div>
+                <div>
+                    <label for="subestacion">Subestación</label>
+                    <input type="text" id="subestacion" name="subestacion" value="{{ subestacion|default('') }}" placeholder="Ejemplo: termozipa" />
+                </div>
+                <div>
+                    <label for="fecha_desde">Fecha desde</label>
+                    <input type="date" id="fecha_desde" name="fecha_desde" value="{{ fecha_desde|default('') }}" />
+                </div>
+                <div>
+                    <label for="fecha_hasta">Fecha hasta</label>
+                    <input type="date" id="fecha_hasta" name="fecha_hasta" value="{{ fecha_hasta|default('') }}" />
+                </div>
+                <div>
+                    <label for="incidente">Incidente</label>
+                    <input type="text" id="incidente" name="incidente" value="{{ incidente|default('') }}" placeholder="Ejemplo: INC000186460365" />
+                </div>
+                <div>
+                    <label for="requerimiento">Requerimiento</label>
+                    <input type="text" id="requerimiento" name="requerimiento" value="{{ requerimiento|default('') }}" placeholder="Ejemplo: REQ000016265179" />
+                </div>
+                <div>
+                    <input type="submit" value="Filtrar" aria-label="Aplicar filtros" />
+                </div>
+            </form>
+        </div>
+
+        <div class="columna-resultados" id="contenedorMensajes" tabindex="0" aria-live="polite" aria-label="Lista de mensajes técnicos">
+            {% if mensajes|length == 0 %}
+                <p class="no-resultados">No se encontraron mensajes técnicos para el filtro especificado.</p>
+            {% else %}
+                {% for m in mensajes %}
+                    <article class="mensaje" tabindex="0" aria-label="Mensaje técnico de {{ m.autor|default('Desconocido') }}">
+                        <div class="header">
+                            <div class="fecha">{{ m.fecha_hora|default('') }}</div>
+                            <div class="autor">{{ m.autor|default('') }}</div>
+                            {% if m.subestacion %}
+                                <div class="subestacion">{{ m.subestacion|default('')|capitalize }}</div>
+                            {% endif %}
+                        </div>
+                        {% if m.incidentes and m.incidentes|length > 0 %}
+                            <div>Incidentes: {{ m.incidentes|join(', ') }}</div>
+                        {% endif %}
+                        {% if m.requerimientos and m.requerimientos|length > 0 %}
+                            <div>Requerimientos: {{ m.requerimientos|join(', ') }}</div>
+                        {% endif %}
+                        <p>{{ m.mensaje|default('') }}</p>
+                    </article>
+                {% endfor %}
+            {% endif %}
+        </div>
+    </div>
+</main>
+
+<!-- Firebase SDK -->
+<script src="https://www.gstatic.com/firebasejs/9.22.1/firebase-app-compat.js"></script>
+<script src="https://www.gstatic.com/firebasejs/9.22.1/firebase-database-compat.js"></script>
+
+<script>
+    // Configura Firebase con tu proyecto (reemplaza con tus datos reales)
+    const firebaseConfig = {
+        apiKey: "TU_API_KEY",
+        authDomain: "TU_PROJECT_ID.firebaseapp.com",
+        databaseURL: "https://mi-app-sincronizacion-default-rtdb.firebaseio.com",
+        projectId: "TU_PROJECT_ID",
+        storageBucket: "TU_PROJECT_ID.appspot.com",
+        messagingSenderId: "TU_SENDER_ID",
+        appId: "TU_APP_ID"
+    };
+
+    // Inicializa Firebase
+    firebase.initializeApp(firebaseConfig);
+
+    const dbRef = firebase.database().ref('mensajes_tecnicos');
+
+    // Escuchar cambios en Firebase y actualizar la lista en tiempo real
+    dbRef.on('value', (snapshot) => {
+        const mensajes = snapshot.val() || [];
+        actualizarListaMensajes(mensajes);
+    });
+
+    // Función para actualizar la lista de mensajes en la UI
+    function actualizarListaMensajes(mensajes) {
+        const contenedor = document.getElementById('contenedorMensajes');
+        contenedor.innerHTML = '';
+
+        if (!mensajes.length) {
+            contenedor.innerHTML = '<p class="no-resultados">No se encontraron mensajes técnicos para el filtro especificado.</p>';
+            return;
+        }
+
+        mensajes.forEach(m => {
+            const article = document.createElement('article');
+            article.className = 'mensaje';
+            article.tabIndex = 0;
+            article.setAttribute('aria-label', `Mensaje técnico de ${m.autor || '

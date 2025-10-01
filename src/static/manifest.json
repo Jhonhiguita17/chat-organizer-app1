@@ -1,0 +1,12 @@
+{
+  "background_color": "#ffffff",
+  "description": "App para gestión de chats, filtros y descargas en networking",
+  "dir": "ltr",
+  "display": "standalone",
+  "name": "laquanda-unimplied-overfondly.ngrok-free",
+  "orientation": "any",
+  "scope": "/",
+  "short_name": "laquanda-unimplied-overfondly.ngrok-free",
+  "start_url": "/",
+  "theme_color": "#21a6f1"
+}
