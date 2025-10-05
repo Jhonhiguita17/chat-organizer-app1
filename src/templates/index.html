@@ -7,13 +7,21 @@
 
     <!-- Favicon -->
     <link rel="icon" type="image/x-icon" href="{{ url_for('static', filename='icons/favicon.ico') }}">
+    <link rel="shortcut icon" href="{{ url_for('static', filename='icons/favicon.ico') }}">
 
     <!-- Manifest PWA -->
     <link rel="manifest" href="{{ url_for('static', filename='manifest.json') }}">
+    
+    <!-- Metas adicionales para PWA (instalabilidad y compatibilidad con manifest.json) -->
     <meta name="theme-color" content="#61dafb">
     <meta name="application-name" content="Networking">
+    <meta name="description" content="App para gestión de chats, filtros y descargas en networking">
+    <link rel="apple-touch-icon" href="{{ url_for('static', filename='icons/icon-192.png') }}">
+    <meta name="apple-mobile-web-app-capable" content="yes">
+    <meta name="apple-mobile-web-app-status-bar-style" content="default">
+    <meta name="mobile-web-app-capable" content="yes">
 
-    <!-- Fuente -->
+    <!-- Fuente (cacheada en service-worker.js) -->
     <link href="https://fonts.googleapis.com/css2?family=Roboto+Mono&display=swap" rel="stylesheet">
 
     <style>
@@ -265,6 +273,11 @@
             margin-bottom: 1rem;
             color: #61dafb;
         }
+        section.subir-chat p {
+            font-size: 0.9rem;
+            color: #a0b0c0;
+            margin-bottom: 1rem;
+        }
         section.subir-chat label {
             display: block;
             margin-bottom: 0.5rem;
@@ -300,9 +313,33 @@
             box-shadow: 0 8px 20px #3bb0f4cc;
             outline: none;
         }
-        section.subir-chat p#mensajeRespuesta {
-            margin-top: 1rem;
+        /* NUEVO: Estilos para mensajes de flash (feedback de subida/sincronización) */
+        .flash-message {
+            margin: 1rem 0;
+            padding: 0.8rem 1.2rem;
+            border-radius: 8px;
             font-weight: 600;
+            text-align: center;
+            animation: fadeIn 0.5s ease-in;
+        }
+        .flash-success {
+            background: #4caf50;
+            color: white;
+            border: 1px solid #45a049;
+        }
+        .flash-error {
+            background: #f44336;
+            color: white;
+            border: 1px solid #da190b;
+        }
+        .flash-warning {
+            background: #ff9800;
+            color: white;
+            border: 1px solid #e68900;
+        }
+        @keyframes fadeIn {
+            from { opacity: 0; transform: translateY(-10px); }
+            to { opacity: 1; transform: translateY(0); }
         }
         /* Mensaje de no resultados adaptado */
         .no-resultados {
@@ -338,15 +375,24 @@
 </header>
 
 <main>
-    <!-- Formulario para subir chat_networking.txt -->
+    <!-- Formulario para subir chat_networking.txt (actualizado para sincronización) -->
     <section class="subir-chat" aria-label="Formulario para subir archivo chat_networking.txt">
-        <h2>Subir archivo chat_networking.txt</h2>
+        <h2>Subir archivo chat_networking.txt (se sincronizará globalmente con Render)</h2>
+        <p>Selecciona el archivo .txt del chat de WhatsApp. Al subir, se procesará y sincronizará en todas las PCs vía Render. Refresca en otras PCs para ver cambios.</p>
         <form id="formSubirChat" enctype="multipart/form-data" method="post" action="{{ url_for('subir_chat') }}">
             <label for="archivo">Selecciona archivo .txt:</label>
             <input type="file" id="archivo" name="archivo" accept=".txt" required />
-            <button type="submit">Subir archivo</button>
+            <button type="submit">Subir y Sincronizar Globalmente</button>
         </form>
-        <p id="mensajeRespuesta" role="alert" aria-live="polite"></p>
+        
+        <!-- NUEVO: Mensajes de feedback (flashes de Flask para éxito/error/warning) -->
+        {% with messages = get_flashed_messages(with_categories=true) %}
+            {% if messages %}
+                {% for category, message in messages %}
+                    <div class="flash-message flash-{{ category }}">{{ message }}</div>
+                {% endfor %}
+            {% endif %}
+        {% endwith %}
     </section>
 
     <!-- Layout en dos columnas: búsqueda y resultados -->
@@ -389,67 +435,13 @@
                 <p class="no-resultados">No se encontraron mensajes técnicos para el filtro especificado.</p>
             {% else %}
                 {% for m in mensajes %}
-                    <article class="mensaje" tabindex="0" aria-label="Mensaje técnico de {{ m.autor|default('Desconocido') }}">
+                    <article class="mensaje" tabindex="0" aria-label="Mensaje de {{ m.autor }}">
                         <div class="header">
-                            <div class="fecha">{{ m.fecha_hora|default('') }}</div>
-                            <div class="autor">{{ m.autor|default('') }}</div>
-                            {% if m.subestacion %}
-                                <div class="subestacion">{{ m.subestacion|default('')|capitalize }}</div>
-                            {% endif %}
+                            <div><strong>{{ m.autor }}</strong> - {{ m.fecha_hora }}</div>
+                            <div class="subestacion">{{ m.subestacion or 'N/A' }}</div>
                         </div>
+                        <p>{{ m.mensaje }}</p>
                         {% if m.incidentes and m.incidentes|length > 0 %}
-                            <div>Incidentes: {{ m.incidentes|join(', ') }}</div>
+                            <p><strong>Incidentes:</strong> {{ m.incidentes|join(', ') }}</p>
                         {% endif %}
-                        {% if m.requerimientos and m.requerimientos|length > 0 %}
-                            <div>Requerimientos: {{ m.requerimientos|join(', ') }}</div>
-                        {% endif %}
-                        <p>{{ m.mensaje|default('') }}</p>
-                    </article>
-                {% endfor %}
-            {% endif %}
-        </div>
-    </div>
-</main>
-
-<!-- Firebase SDK -->
-<script src="https://www.gstatic.com/firebasejs/9.22.1/firebase-app-compat.js"></script>
-<script src="https://www.gstatic.com/firebasejs/9.22.1/firebase-database-compat.js"></script>
-
-<script>
-    // Configura Firebase con tu proyecto (reemplaza con tus datos reales)
-    const firebaseConfig = {
-        apiKey: "TU_API_KEY",
-        authDomain: "TU_PROJECT_ID.firebaseapp.com",
-        databaseURL: "https://mi-app-sincronizacion-default-rtdb.firebaseio.com",
-        projectId: "TU_PROJECT_ID",
-        storageBucket: "TU_PROJECT_ID.appspot.com",
-        messagingSenderId: "TU_SENDER_ID",
-        appId: "TU_APP_ID"
-    };
-
-    // Inicializa Firebase
-    firebase.initializeApp(firebaseConfig);
-
-    const dbRef = firebase.database().ref('mensajes_tecnicos');
-
-    // Escuchar cambios en Firebase y actualizar la lista en tiempo real
-    dbRef.on('value', (snapshot) => {
-        const mensajes = snapshot.val() || [];
-        actualizarListaMensajes(mensajes);
-    });
-
-    // Función para actualizar la lista de mensajes en la UI
-    function actualizarListaMensajes(mensajes) {
-        const contenedor = document.getElementById('contenedorMensajes');
-        contenedor.innerHTML = '';
-
-        if (!mensajes.length) {
-            contenedor.innerHTML = '<p class="no-resultados">No se encontraron mensajes técnicos para el filtro especificado.</p>';
-            return;
-        }
-
-        mensajes.forEach(m => {
-            const article = document.createElement('article');
-            article.className = 'mensaje';
-            article.tabIndex = 0;
-            article.setAttribute('aria-label', `Mensaje técnico de ${m.autor || '
+                        {% if m.requerimientos and m.requerimientos

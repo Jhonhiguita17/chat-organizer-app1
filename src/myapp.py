@@ -1,7 +1,8 @@
 import sys
 import os
 import socket
-from flask import Flask, render_template, request, redirect, url_for, session, flash, send_from_directory, abort
+import requests  # NUEVO: Para sincronización con Render
+from flask import Flask, render_template, request, redirect, url_for, session, flash, send_from_directory, abort, jsonify  # NUEVO: jsonify para APIs
 import json
 from datetime import datetime
 from math import ceil
@@ -54,7 +55,11 @@ app = Flask(
 
 app.secret_key = 'cambia_esto_por_una_clave_muy_segura'  # Cambia por una clave segura
 
-def cargar_datos_json():
+# NUEVO: Configuraciones para sincronización con Render
+URL_RENDER = os.environ.get('URL_RENDER', 'https://tu-app.onrender.com')  # Cambia por tu URL real de Render
+SYNC_TOKEN = os.environ.get('SYNC_TOKEN', 'mi_token_secreto_2024')  # Token secreto para auth (cámbialo y configúralo en env vars)
+
+def cargar_datos_json_local():  # RENOMBRADO: Tu función original, ahora como fallback local
     if not os.path.isfile(ruta_json):
         contenido_inicial = [
             {
@@ -68,7 +73,7 @@ def cargar_datos_json():
             {
                 "autor": "Ana Gomez",
                 "mensaje": "Revisión realizada en CE Sur",
-                "ce": "CE Sur",
+                "subestacion": "CE Sur",  # CORREGIDO: Cambiado de "ce" a "subestacion" para consistencia
                 "fecha_hora": "2024-06-02T11:00:00",
                 "incidentes": [],
                 "requerimientos": []
@@ -80,10 +85,43 @@ def cargar_datos_json():
         with open(ruta_json, 'r', encoding='utf-8') as f:
             return json.load(f)
     except Exception as e:
-        print(f"Error cargando JSON: {e}")
+        print(f"Error cargando JSON local: {e}")
         return []
 
-datos = cargar_datos_json()
+# NUEVO: Cargar datos iniciales locales (fallback)
+datos = cargar_datos_json_local()
+
+# NUEVO: Función para descargar JSON desde Render (sincronización)
+def fetch_datos_from_render():
+    """Descarga JSON desde Render. Retorna lista o None si falla."""
+    try:
+        response = requests.get(f"{URL_RENDER}/api/datos_json", timeout=10)
+        if response.status_code == 200:
+            data = response.json()
+            print(f"JSON sincronizado desde Render: {len(data)} mensajes")
+            return data
+        else:
+            print(f"Error fetch de Render: {response.status_code}")
+            return None
+    except Exception as e:
+        print(f"Error conectando a Render: {e} (usando datos locales)")
+        return None
+
+# NUEVO: Función para enviar JSON actualizado a Render
+def push_datos_to_render(datos):
+    """Sube JSON actualizado a Render. Retorna True si éxito."""
+    try:
+        headers = {'Authorization': f'Bearer {SYNC_TOKEN}'}  # Token en header para auth
+        response = requests.post(f"{URL_RENDER}/api/actualizar_json", json=datos, headers=headers, timeout=10)
+        if response.status_code == 200:
+            print(f"JSON sincronizado a Render: {len(datos)} mensajes")
+            return True
+        else:
+            print(f"Error push a Render: {response.status_code} - {response.text}")
+            return False
+    except Exception as e:
+        print(f"Error enviando a Render: {e}")
+        return False
 
 def es_tecnico(mensaje):
     palabras_tecnicas = [
@@ -161,7 +199,19 @@ def login():
 
 @app.route('/')
 def index():
-    global datos
+    # NUEVO: Cargar datos dinámicamente desde Render (sincronización)
+    datos_actualizados = fetch_datos_from_render()
+    if datos_actualizados:
+        datos = datos_actualizados
+        # Guardar local para uso offline
+        try:
+            with open(ruta_json, 'w', encoding='utf-8') as f:
+                json.dump(datos, f, indent=4, ensure_ascii=False)
+        except Exception as e:
+            print(f"Error guardando JSON local después de sync: {e}")
+    else:
+        datos = cargar_datos_json_local()  # Fallback local si no hay internet
+
     usuario = session.get('usuario')
     if not usuario:
         return redirect(url_for('login'))
@@ -197,7 +247,7 @@ def index():
         if incidente and incidente not in incidentes_m and incidente not in texto:
             continue
 
-        requerimientos_m = [normalizar_texto(r) for r in m.get('requerimientos') if isinstance(r, str)]
+        requerimientos_m = [normalizar_texto(r) for r in m.get('requerimientos', []) if isinstance(r, str)]  # CORREGIDO: Agregado default []
         if requerimiento and requerimiento not in requerimientos_m and requerimiento not in texto:
             continue
 
@@ -244,7 +294,8 @@ def index():
         requerimiento=requerimiento,
         pagina=pagina,
         total_paginas=total_paginas,
-        carpeta_descargas=carpeta_descargas
+        carpeta_descargas=carpeta_descargas,
+        url_render=URL_RENDER  # NUEVO: Para usar en HTML (ej: links o detección)
     )
 
 @app.route('/logout')
@@ -252,9 +303,9 @@ def logout():
     session.pop('usuario', None)
     return redirect(url_for('login'))
 
-@app.route('/api/subir_chat', methods=['POST'])
+# CAMBIADO: Ruta de subida (sin /api/, para que coincida con form HTML)
+@app.route('/subir_chat', methods=['POST'])
 def subir_chat():
-    global datos
     if 'archivo' not in request.files:
         flash("No se encontró el archivo en la petición", "error")
         return redirect(url_for('index'))
@@ -278,17 +329,58 @@ def subir_chat():
         mensajes = main.parsear_chat(ruta_chat_original)
         datos_organizados = main.organizar_datos(mensajes)
 
+        # Guardar local para actualización inmediata
         with open(ruta_json, 'w', encoding='utf-8') as f:
             json.dump(datos_organizados, f, indent=4, ensure_ascii=False)
 
+        # NUEVO: Actualizar variable global local
         datos = datos_organizados
 
-        flash(f"Archivo chat_networking.txt subido y procesado correctamente. Total mensajes: {len(mensajes)}", "success")
+        # NUEVO: Sincronizar con Render (propaga a todas las PCs)
+        if push_datos_to_render(datos_organizados):
+            flash(f"Archivo subido y sincronizado globalmente con Render. Total mensajes: {len(mensajes)}", "success")
+        else:
+            flash(f"Archivo subido y procesado localmente. Total mensajes: {len(mensajes)}. Sincronización con Render falló (verifica internet/token). Refresca después para sync.", "warning")
+
         return redirect(url_for('index'))
 
     except Exception as e:
         flash(f"Error procesando el archivo: {e}", "error")
         return redirect(url_for('index'))
+
+# NUEVO: Ruta API para descargar JSON central (accesible por PCs locales)
+@app.route('/api/datos_json')
+def api_datos_json():
+    try:
+        datos_central = cargar_datos_json_local()  # En Render, esto es el central
+        return jsonify(datos_central)
+    except Exception as e:
+        print(f"Error en API datos_json: {e}")
+        abort(500, str(e))
+
+# NUEVO: Ruta API para actualizar JSON central (solo con token, POST desde PCs)
+@app.route('/api/actualizar_json', methods=['POST'])
+def api_actualizar_json():
+    # Verifica token de sincronización
+    auth_header = request.headers.get('Authorization')
+    if not auth_header or auth_header != f'Bearer {SYNC_TOKEN}':
+        abort(401, "Token de sincronización inválido")
+
+    try:
+        datos_nuevos = request.json
+        if not isinstance(datos_nuevos, list):
+            abort(400, "Datos deben ser una lista de mensajes")
+
+        # Guarda en el archivo central (en Render)
+        with open(ruta_json, 'w', encoding='utf-8') as f:
+            json.dump(datos_nuevos, f, indent=4, ensure_ascii=False)
+
+        print(f"JSON actualizado en Render desde PC: {len(datos_nuevos)} mensajes")
+        return jsonify({"success": True, "mensaje": f"Actualizado: {len(datos_nuevos)} mensajes"}), 200
+
+    except Exception as e:
+        print(f"Error actualizando JSON: {e}")
+        abort(500, str(e))
 
 # Ruta para descargar archivos desde la carpeta 'descargas'
 @app.route('/descargar/<path:nombre_archivo>')
@@ -308,6 +400,12 @@ def service_worker():
     return send_from_directory(resource_path, 'service-worker.js')
 
 if __name__ == '__main__':
+    # NUEVO: Detectar modo (local o Render)
+    modo = "Render (cloud)" if os.environ.get('RENDER') == 'true' else "Local"
+    print(f"Modo: {modo}")
+    print(f"URL Render configurada: {URL_RENDER}")
+    print(f"Token sync configurado: {'Sí' if SYNC_TOKEN else 'No (usa default)'}")
+
     def get_local_ip():
         try:
             s = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)

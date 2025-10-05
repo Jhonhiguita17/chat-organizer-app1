@@ -1,0 +1,23 @@
+# Ignorar archivos compilados de Python
+__pycache__/
+*.pyc
+
+# Ignorar entorno virtual y variables de entorno
+.env
+venv/
+env/
+
+# Ignorar carpeta data con archivos dinámicos y logs
+data/
+
+# No ignorar descargas porque quieres subirla para que los usuarios descarguen archivos
+
+# Ignorar archivos temporales del sistema
+.DS_Store
+Thumbs.db
+
+# Ignorar archivos de editor (opcional, según el editor que uses)
+.vscode/
+.idea/
+*.sublime-project
+*.sublime-workspace
